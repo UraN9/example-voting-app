@@ -1,0 +1,66 @@
+name: Build and Deploy Voting App
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to ACR
+        run: az acr login --name acrkshyvetskyi
+
+      - name: Build and push vote
+        run: |
+          docker build -t acrkshyvetskyi.azurecr.io/vote:latest ./vote
+          docker push acrkshyvetskyi.azurecr.io/vote:latest
+
+      - name: Build and push result
+        run: |
+          docker build -t acrkshyvetskyi.azurecr.io/result:latest ./result
+          docker push acrkshyvetskyi.azurecr.io/result:latest
+
+      - name: Build and push worker
+        run: |
+          docker build -t acrkshyvetskyi.azurecr.io/worker:latest ./worker
+          docker push acrkshyvetskyi.azurecr.io/worker:latest
+
+      - name: Update docker-compose.yml
+        run: |
+          sed -i 's|build: ./vote|image: acrkshyvetskyi.azurecr.io/vote:latest|g' docker-compose.yml
+          sed -i 's|build: ./result|image: acrkshyvetskyi.azurecr.io/result:latest|g' docker-compose.yml
+          sed -i 's|build: ./worker|image: acrkshyvetskyi.azurecr.io/worker:latest|g' docker-compose.yml
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "GitHub Actions"
+          git add docker-compose.yml
+          git commit -m "Update images to ACR latest" || echo "No changes"
+          git push
+
+      - name: Deploy to VM via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.VM_PUBLIC_IP }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            APP_DIR="/home/${{ secrets.VM_USERNAME }}/example-voting-app"
+            mkdir -p $APP_DIR
+            cd $APP_DIR
+            if [ ! -d ".git" ]; then
+              git clone https://github.com/UraN9/example-voting-app.git .
+            else
+              git pull origin master
+            fi
+            docker compose pull vote result worker || true
+            docker compose up -d --remove-orphans
