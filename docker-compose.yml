@@ -25,7 +25,7 @@ services:
       - back-tier
 
   result:
-    build: ./result
+    image: acrkshyvetskyi.azurecr.io/result:latest
     # use nodemon rather than node for local dev
     entrypoint: nodemon --inspect=0.0.0.0 server.js
     depends_on:
