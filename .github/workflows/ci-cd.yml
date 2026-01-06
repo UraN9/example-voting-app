@@ -48,16 +48,6 @@ jobs:
             .services.worker |= del(.build) | .image = "acrkshyvetskyi.azurecr.io/worker:latest" | .pull_policy = "always"
           ' docker-compose.prod.yml
 
-      - name: Copy production compose to VM
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VM_PUBLIC_IP }}
-          username: ${{ secrets.VM_USERNAME }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          source: docker-compose.prod.yml
-          target: /home/${{ secrets.VM_USERNAME }}/example-voting-app/docker-compose.yml
-          overwrite: true   
-
       - name: Deploy on VM
         uses: appleboy/ssh-action@v1.0.3
         with:
