@@ -36,18 +36,6 @@ jobs:
           docker build -t acrkshyvetskyi.azurecr.io/worker:latest ./worker
           docker push acrkshyvetskyi.azurecr.io/worker:latest
 
-      - name: Prepare production docker-compose.yml
-        run: |
-          # Робимо копію і модифікуємо тільки для деплою
-          cp docker-compose.yml docker-compose.prod.yml
-          
-          # Видаляємо dev-опції та замінюємо build на image
-          yq -i '
-            .services.vote |= del(.build, .volumes) | .image = "acrkshyvetskyi.azurecr.io/vote:latest" | .pull_policy = "always" |
-            .services.result |= del(.build, .volumes, .entrypoint) | del(.services.result.ports[] | select(. == "127.0.0.1:9229:9229")) | .image = "acrkshyvetskyi.azurecr.io/result:latest" | .pull_policy = "always" |
-            .services.worker |= del(.build) | .image = "acrkshyvetskyi.azurecr.io/worker:latest" | .pull_policy = "always"
-          ' docker-compose.prod.yml
-
       - name: Deploy to VM
         uses: appleboy/ssh-action@v1.0.3
         with:
