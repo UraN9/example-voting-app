@@ -18,7 +18,7 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Login to ACR
+      - name: Login to ACR (for build)
         run: az acr login --name acrkshyvetskyi
 
       - name: Build and push vote
@@ -36,32 +36,34 @@ jobs:
           docker build -t acrkshyvetskyi.azurecr.io/worker:latest ./worker
           docker push acrkshyvetskyi.azurecr.io/worker:latest
 
-      - name: Update docker-compose.yml
+      - name: Prepare production docker-compose.yml
         run: |
-          sed -i 's|build: ./vote|image: acrkshyvetskyi.azurecr.io/vote:latest|g' docker-compose.yml
-          sed -i 's|build: ./result|image: acrkshyvetskyi.azurecr.io/result:latest|g' docker-compose.yml
-          sed -i 's|build: ./worker|image: acrkshyvetskyi.azurecr.io/worker:latest|g' docker-compose.yml
-          git config --global user.email "github-actions@github.com"
-          git config --global user.name "GitHub Actions"
-          git add docker-compose.yml
-          git commit -m "Update images to ACR latest" || echo "No changes"
-          git push
+          # Робимо копію і модифікуємо тільки для деплою
+          cp docker-compose.yml docker-compose.prod.yml
+          
+          # Видаляємо dev-опції та замінюємо build на image
+          yq -i '
+            .services.vote |= del(.build, .volumes) | .image = "acrkshyvetskyi.azurecr.io/vote:latest" | .pull_policy = "always" |
+            .services.result |= del(.build, .volumes, .entrypoint) | del(.services.result.ports[] | select(. == "127.0.0.1:9229:9229")) | .image = "acrkshyvetskyi.azurecr.io/result:latest" | .pull_policy = "always" |
+            .services.worker |= del(.build) | .image = "acrkshyvetskyi.azurecr.io/worker:latest" | .pull_policy = "always"
+          ' docker-compose.prod.yml
 
-      - name: Deploy to VM via SSH
-        uses: appleboy/ssh-action@v0.1.10
+      - name: Copy production compose to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_PUBLIC_IP }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: docker-compose.prod.yml
+          target: /home/${{ secrets.VM_USERNAME }}/example-voting-app/docker-compose.yml
+
+      - name: Deploy on VM
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_PUBLIC_IP }}
           username: ${{ secrets.VM_USERNAME }}
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
-            az acr login --name acrkshyvetskyi
-            APP_DIR="/home/${{ secrets.VM_USERNAME }}/example-voting-app"
-            mkdir -p $APP_DIR
-            cd $APP_DIR
-            if [ ! -d ".git" ]; then
-              git clone https://github.com/UraN9/example-voting-app.git .
-            else
-              git pull origin master
-            fi
-            docker compose pull vote result worker || true
+            cd /home/${{ secrets.VM_USERNAME }}/example-voting-app
+            docker compose pull vote result worker
             docker compose up -d --remove-orphans
