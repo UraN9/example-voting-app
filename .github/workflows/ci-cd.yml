@@ -56,6 +56,7 @@ jobs:
           key: ${{ secrets.VM_SSH_KEY }}
           source: docker-compose.prod.yml
           target: /home/${{ secrets.VM_USERNAME }}/example-voting-app/docker-compose.yml
+          overwrite: true   
 
       - name: Deploy on VM
         uses: appleboy/ssh-action@v1.0.3
