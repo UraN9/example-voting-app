@@ -48,13 +48,14 @@ jobs:
             .services.worker |= del(.build) | .image = "acrkshyvetskyi.azurecr.io/worker:latest" | .pull_policy = "always"
           ' docker-compose.prod.yml
 
-      - name: Deploy on VM
+      - name: Deploy to VM
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_PUBLIC_IP }}
           username: ${{ secrets.VM_USERNAME }}
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
+            az acr login --name acrkshyvetskyi
             cd /home/${{ secrets.VM_USERNAME }}/example-voting-app
-            docker compose pull vote result worker
+            docker compose pull
             docker compose up -d --remove-orphans
