@@ -1,4 +1,4 @@
-name: Build and Deploy Voting App
+name: CI-CD Voting App
 
 on:
   push:
@@ -6,44 +6,59 @@ on:
       - main
 
 jobs:
-  build-and-deploy:
+  build-push-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Checkout repo
+      uses: actions/checkout@v4
 
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Login to ACR (for build)
-        run: az acr login --name acrkshyvetskyi
+    - name: Login to ACR
+      run: |
+        az acr login --name ${{ secrets.ACR_LOGIN_SERVER }}
 
-      - name: Build and push vote
-        run: |
-          docker build -t acrkshyvetskyi.azurecr.io/vote:latest ./vote
-          docker push acrkshyvetskyi.azurecr.io/vote:latest
+    - name: Build and push vote
+      run: |
+        docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/vote:latest ./vote
+        docker push ${{ secrets.ACR_LOGIN_SERVER }}/vote:latest
 
-      - name: Build and push result
-        run: |
-          docker build -t acrkshyvetskyi.azurecr.io/result:latest ./result
-          docker push acrkshyvetskyi.azurecr.io/result:latest
+    - name: Build and push result
+      run: |
+        docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/result:latest ./result
+        docker push ${{ secrets.ACR_LOGIN_SERVER }}/result:latest
 
-      - name: Build and push worker
-        run: |
-          docker build -t acrkshyvetskyi.azurecr.io/worker:latest ./worker
-          docker push acrkshyvetskyi.azurecr.io/worker:latest
+    - name: Build and push worker
+      run: |
+        docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/worker:latest ./worker
+        docker push ${{ secrets.ACR_LOGIN_SERVER }}/worker:latest
 
-      - name: Deploy to VM
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_PUBLIC_IP }}
-          username: ${{ secrets.VM_USERNAME }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          script: |
-            az acr login --name acrkshyvetskyi
-            cd /home/${{ secrets.VM_USERNAME }}/example-voting-app
-            docker compose pull
-            docker compose up -d --remove-orphans
+    - name: Update docker-compose.yml
+      run: |
+        sed -i "s|build: ./vote|image: ${{ secrets.ACR_LOGIN_SERVER }}/vote:latest|g" docker-compose.yml
+        sed -i "s|build: ./result|image: ${{ secrets.ACR_LOGIN_SERVER }}/result:latest|g" docker-compose.yml
+        sed -i "s|build: ./worker|image: ${{ secrets.ACR_LOGIN_SERVER }}/worker:latest|g" docker-compose.yml
+
+    - name: Copy docker-compose to VM
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.VM_PUBLIC_IP }}
+        username: ${{ secrets.VM_USERNAME }}
+        key: ${{ secrets.VM_SSH_KEY }}
+        source: docker-compose.yml
+        target: ~/voting-app
+
+    - name: Deploy on VM
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.VM_PUBLIC_IP }}
+        username: ${{ secrets.VM_USERNAME }}
+        key: ${{ secrets.VM_SSH_KEY }}
+        script: |
+          cd ~/voting-app
+          docker compose pull
+          docker compose up -d --remove-orphans
