@@ -3,56 +3,56 @@
 # docker-compose v1.27+ required
 
 services:
-  vote:
-    image: acrkshyvetskyi.azurecr.io/vote:latest
-    pull_policy: always
-    # depends_on:
-    #   redis:
-    #     condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    ports:
-      - "8080:80"
-    networks:
-      - front-tier
-      - back-tier
-
-  result:
-    image: acrkshyvetskyi.azurecr.io/result:latest
-    pull_policy: always
-    # depends_on:
-    #   db:
-    #     condition: service_healthy
-    ports:
-      - "8081:80"
-    networks:
-      - front-tier
-      - back-tier
-
-  worker:
-    image: acrkshyvetskyi.azurecr.io/worker:latest
-    pull_policy: always
-    # depends_on:
-    #   redis:
-    #     condition: service_healthy
-    #   db:
-    #     condition: service_healthy
-    networks:
-      - back-tier
-
-  # redis:
-  #   image: redis:alpine
-  #   volumes:
-  #     - "./healthchecks:/healthchecks"
+  # vote:
+  #   image: acrkshyvetskyi.azurecr.io/vote:latest
+  #   pull_policy: always
+  #   # depends_on:
+  #   #   redis:
+  #   #     condition: service_healthy
   #   healthcheck:
-  #     test: /healthchecks/redis.sh
-  #     interval: "5s"
+  #     test: ["CMD", "curl", "-f", "http://localhost"]
+  #     interval: 15s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 10s
+  #   ports:
+  #     - "8080:80"
+  #   networks:
+  #     - front-tier
+  #     - back-tier
+
+  # result:
+  #   image: acrkshyvetskyi.azurecr.io/result:latest
+  #   pull_policy: always
+  #   # depends_on:
+  #   #   db:
+  #   #     condition: service_healthy
+  #   ports:
+  #     - "8081:80"
+  #   networks:
+  #     - front-tier
+  #     - back-tier
+
+  # worker:
+  #   image: acrkshyvetskyi.azurecr.io/worker:latest
+  #   pull_policy: always
+  #   # depends_on:
+  #   #   redis:
+  #   #     condition: service_healthy
+  #   #   db:
+  #   #     condition: service_healthy
   #   networks:
   #     - back-tier
+
+  redis:
+    image: redis:alpine
+    volumes:
+      - "./healthchecks:/healthchecks"
+    healthcheck:
+      test: /healthchecks/redis.sh
+      interval: "5s"
+    networks:
+      - back-tier
 
   # db:
   #   image: postgres:15-alpine
