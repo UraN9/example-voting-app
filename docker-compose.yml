@@ -6,9 +6,9 @@ services:
   vote:
     image: acrkshyvetskyi.azurecr.io/vote:latest
     pull_policy: always
-    depends_on:
-      redis:
-        condition: service_healthy
+    # depends_on:
+    #   redis:
+    #     condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost"]
       interval: 15s
@@ -24,9 +24,9 @@ services:
   result:
     image: acrkshyvetskyi.azurecr.io/result:latest
     pull_policy: always
-    depends_on:
-      db:
-        condition: service_healthy
+    # depends_on:
+    #   db:
+    #     condition: service_healthy
     ports:
       - "8081:80"
     networks:
@@ -36,22 +36,21 @@ services:
   worker:
     image: acrkshyvetskyi.azurecr.io/worker:latest
     pull_policy: always
-    depends_on:
-      redis:
-        condition: service_healthy
-      db:
-        condition: service_healthy
+    # depends_on:
+    #   redis:
+    #     condition: service_healthy
+      # db:
+      #   condition: service_healthy
     networks:
       - back-tier
 
   redis:
     image: redis:alpine
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
+    volumes:
+      - "./healthchecks:/healthchecks"
+    # healthcheck:
+    #   test: /healthchecks/redis.sh
+    #   interval: "5s"
     networks:
       - back-tier
 
@@ -63,9 +62,9 @@ services:
     volumes:
       - "db-data:/var/lib/postgresql/data"
       - "./healthchecks:/healthchecks"
-    healthcheck:
-      test: /healthchecks/postgres.sh
-      interval: "5s"
+    # healthcheck:
+    #   test: /healthchecks/postgres.sh
+    #   interval: "5s"
     networks:
       - back-tier
 
